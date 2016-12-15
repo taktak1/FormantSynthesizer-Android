@@ -21,7 +21,7 @@ public class VocalFilter {
     private int nSample;    // Number of sample
     private double[] points;    // Sampling point (pi/nSample)
     private Complex[] value;    // Value at sampling point
-    private double[] magnitude; // Magnitude of value point
+    private double[] magnitude, phase; // Magnitude of value point
 
     // Constructor
     public VocalFilter(int[] formant, int[] bandwidth, int fs) {
@@ -47,8 +47,24 @@ public class VocalFilter {
 
     // Calculate frequency response of vocal filter
     private void setTransferFunction() {
-        setPoles();
-        zp2tf(zeros, poles, 1);
+//        setPoles();
+//        zp2tf(zeros, poles, 1);
+        double val = 1;
+        for (int i = 0; i < 3; i++) {
+            val *= (1 - 2 * zk(bandwidth[i], fs) * costk(formant[i], fs) + zk(bandwidth[i], fs) * zk(bandwidth[i], fs));
+        }
+        Polynomial numerator = new Polynomial(Complex.ZERO, 0, new Complex(val, 0));
+
+        Polynomial denominator = new Polynomial();
+        for (int i = 0; i < 3; i++) {
+            Complex a = new Complex(1, 0);
+            Complex b = new Complex(-2 * zk(bandwidth[i], fs) * costk(formant[i], fs), 0);
+            Complex c = new Complex(zk(bandwidth[i], fs) * zk(bandwidth[i], fs), 0);
+            Polynomial factor = new Polynomial(b, 1, a);
+            factor = factor.plus(new Polynomial(c, 2, Complex.ZERO));
+            denominator = denominator.times(factor);
+        }
+        transferFunction = new Fraction(numerator, denominator);
     }
 
     // Get poles
@@ -70,21 +86,30 @@ public class VocalFilter {
         }
     }
 
-    // Zero-pole to transfer function
-    private void zp2tf(Complex[] zeros, Complex[] poles, double k) {
-        // Numerator
-        Polynomial numerator = new Polynomial();
-        for (Complex item : zeros) {
-            Polynomial factor = new Polynomial(new Complex(1, 0), 1, Complex.ZERO.minus(item));
-            numerator = numerator.times(factor);
-        }
-        // Denominator
-        Polynomial denominator = new Polynomial();
-        for (Complex item : poles) {
-            Polynomial factor = new Polynomial(new Complex(1, 0), 1, Complex.ZERO.minus(item));
-            denominator = denominator.times(factor);
-        }
-        transferFunction = new Fraction(numerator, denominator);
+//    // Zero-pole to transfer function
+//    private void zp2tf(Complex[] zeros, Complex[] poles, double k) {
+//        // Numerator
+//        Polynomial numerator = new Polynomial();
+//        for (Complex item : zeros) {
+//            Polynomial factor = new Polynomial(new Complex(1, 0), 1, Complex.ZERO.minus(item));
+//            numerator = numerator.times(factor);
+//        }
+//        // Denominator
+//        Polynomial denominator = new Polynomial();
+//        for (Complex item : poles) {
+//            Polynomial factor = new Polynomial(new Complex(1, 0), 1, Complex.ZERO.minus(item));
+//            denominator = denominator.times(factor);
+//        }
+//        transferFunction = new Fraction(numerator, denominator);
+//    }
+
+
+    private double zk(int B, int Fs) {
+        return Math.exp(-B * Math.PI / Fs);
+    }
+
+    private double costk(int F, int Fs) {
+        return Math.cos(2 * Math.PI * F / Fs);
     }
 
     // Frequency response of a filter
@@ -103,12 +128,17 @@ public class VocalFilter {
         for (int i = 0; i < nSample; i++) magnitude[i] = 20 * Math.log10(magnitude[i]/ max_value);
     }
 
+    private void setPhase(){
+        phase = new double[nSample];
+        for (int i = 0; i < nSample; i++) phase[i] = value[i].phase() / Math.PI * 180;
+    }
+
     // Sampling
-    public GraphItem Sampling(int nSample){
+    public void Sampling(int nSample){
         this.nSample = nSample;
         freqz();
         setMagnitude();
-        return new GraphItem(points, magnitude);
+        setPhase();
     }
 
     public int[] getFormant() {
@@ -147,13 +177,11 @@ public class VocalFilter {
         return value;
     }
 
-    public double[] getMagnitude() {
-        return magnitude;
+    public GraphItem getMagnitude() {
+        return new GraphItem(points, magnitude);
     }
 
-    public static void main(String[] args) {
-        VocalFilter vocalFilter = new VocalFilter();
-        vocalFilter.Sampling(1024);
-        for (double item : vocalFilter.getMagnitude()) System.out.println(item);
+    public GraphItem getPhase() {
+        return new GraphItem(points, phase);
     }
 }

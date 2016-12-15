@@ -1,5 +1,6 @@
 package com.formantsynthesizer.Filter;
 
+import com.formantsynthesizer.Filter.MathUtils.CommonMath;
 import com.formantsynthesizer.Filter.MathUtils.Fraction;
 import com.formantsynthesizer.Filter.MathUtils.Polynomial;
 import com.formantsynthesizer.Filter.MathUtils.Complex;
@@ -90,20 +91,24 @@ public class VocalFilter {
     private void freqz() {
         value = new Complex[nSample];
         points = new double[nSample];
-        for (int i = 0; i < nSample; i++) points[i] = (Math.PI / nSample * i) / Math.PI;
+        for (int i = 0; i < nSample; i++) points[i] = (this.fs  * i) / (nSample * 2);
+        double c = points[1023];
         value = transferFunction.evaluate(nSample);
-
     }
 
     private void setMagnitude() {
         magnitude = new double[nSample];
-        for (int i = 0; i < nSample; i++) magnitude[i] = 20 * Math.log10(value[i].abs());
+        for (int i = 0; i < nSample; i++) magnitude[i] = value[i].abs();
+        double max_value = CommonMath.findMax(magnitude);
+        for (int i = 0; i < nSample; i++) magnitude[i] = 20 * Math.log10(magnitude[i]/ max_value);
     }
 
-    public void Sampling(int nSample){
+    // Sampling
+    public GraphItem Sampling(int nSample){
         this.nSample = nSample;
         freqz();
         setMagnitude();
+        return new GraphItem(points, magnitude);
     }
 
     public int[] getFormant() {
